@@ -1,0 +1,512 @@
+
+<html>
+<head>
+
+<title>Geolocation</title>
+<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?libraries=places&sensor=false"></script>    
+<script src='intelxdk.js'></script>
+<script src="js/jquery-1.8.0.min.js"></script>
+<script src="js/underscore.js"></script>
+<script src="js/backbone.js"></script>	
+<script type="text/javascript" src="js/main.js"></script>
+
+<link rel="stylesheet" href="css/style.css">
+    
+<style type="text/css">
+* { -webkit-user-select:none; -webkit-tap-highlight-color:rgba(255, 255, 255, 0); -ms-touch-action:none;} 
+</style>
+    
+</head>
+
+<body>
+    <div class="page">
+    
+    </div>
+    <div class="header">
+        <a href="#/"><h1>biTip</h1></a>
+    </div>
+    <a class="himg-left"><img src="images/back.png" onclick="goBack()" /></a>
+    <!--<a class="himg-right" href="#settingsModal"><img src="images/settings.png" /></a>-->
+	<script type="text/template" id="user-list-template">
+        <div class="container" id="userlist">
+            <% _.each(clients, function(client) { %>
+                <a href="#/client/<%= client.get('id') %>"><img src="<%= client.get('image') %>" class="portrait-list" /></a>
+            <% }); %>
+        </div>
+	</script>
+    <script type="text/template" id="register-est-template">
+        <div class="container">
+            <form class="form-reg-est">
+                <input type="text" class="reg-input" name="name" id="reg-est-name" placeholder="Name" />
+                <input type="text" class="reg-input" name="address" id="reg-est-address" placeholder="Address" />
+                <input type="text" class="reg-input" name="country" id="reg-est-country" placeholder="Country" />
+                <input type="text" class="reg-input" name="state" id="reg-est-state" placeholder="State" />
+                <input type="text" class="reg-input" name="postal" id="reg-est-postal" placeholder="Postal Code" />
+                <input type="text" class="reg-input" name="verification" id="reg-est-code" placeholder="Verification Code" />
+                <input type="hidden" name="id" value="">
+                <input type="hidden" name="verification" value="">
+                <input type="submit" value="Register Place"/>
+            </form>
+        </div>
+    </script>
+    <script type="text/template" id="home-template">
+        <div class="home-blue">
+            <a class="button-text" href="#/search"><h5>Locate</h5></a>
+        </div>
+        <div class="home-green">
+            <a class="button-text" href="#/scan"><h5>Scan</h5></a>
+        </div>
+        <div class="home-orange">
+            <a class="button-text" href="#/signup"><h5>Signup</h5></a>
+        </div>
+        </div>        
+    </script>
+    <script type="text/template" id="signup-template">
+        <div class="container" >
+            <div class="signup">
+            <h4>Signup</h4>
+            <form class="new-user-form" name="new-user-form">
+                <input name="email" class="reg-input" type="text" id="regEmail" placeholder="E-mail" />
+                <input name="password" class="reg-input" type="password" id="regPassword" placeholder="Password" />
+                <div class="regRadios">
+                    <input type="radio" id="tipper" value="tipper">
+                    <label for="tipper">Tipper</label>
+                    <input type="radio" id="receiver" value="receiver">
+                    <label for="receiver">Receiver</label>
+                </div>
+                <input type="submit">
+            </form>
+            <a href="#placeModal">Test</a>
+            <div id="placeModal" class="modalDialog">
+                <div>
+                    <a href="#close" title="Close" class="close">X</a>
+                    <h4>Enter an ID and a verifcation code to attach to an establishment, or close to cancel</h4>
+                    <form class="attach-form">
+                        <input name="id" class="reg-input" type="text" id="estID" placeholder="Establishment ID" />
+                        <input name="verification" class="reg-input" type="text" id="estVerification" placeholder="Verification Code" />
+                        <input type="submit" class="btnAttach" />
+                    </form>
+                </div>
+            </div>
+            </div>
+        </div>
+    </script>
+    <script type="text/template" id="user-template">
+    <div id="commentModal" class="modalDialog">
+        <div>
+            <a href="#close" title="Close" class="close">X</a>
+            <p id="pComment" />
+        </div>
+    </div>
+        <div class="container" >
+            <img id="portrait" src="<%= client.get('image') %>" />
+            <button class="tip-button" id="tip-button">Tip</button>
+            <input class="local-input" onClick="this.select();" step="0.25" id="local-input" type="text" value="5.00" />
+            <input class="bitcoin-input" id="bitcoin-input" type="text" value="0.001" />
+            <select class="currency" id="currency">
+                <option value="USD">USD</option>
+                <option value="CAD">CAD</option>
+            </select>
+            <h9>BTC</h9>
+            <textarea class="comment-area" id="comment-area" name="comment" placeholder="Leave a comment?" />
+            <div class="recent-tips">
+            <% _.each(tips, function(tip) { %>                
+                <div class="rtip">
+                    <h7><%= tip.get('amount') %></h7>
+                    <% if(tip.get('message')) { %>
+                        <img src="images/comment.png" class="tip-img" onclick="showComment('<%= tip.get('message') %>');">
+                    <% }; %>
+                </div>
+            <% }); %>
+            </div>
+        </div>
+    </script>  
+    <script type="text/template" id="map">
+        <div class="container">
+            <div id="map_canvas" />
+            <!--<input id="estSearch" class="search-input" type="search" placeholder="Search" onfocus="scroll()" />
+            <button class="btnSearch">Search</button>-->
+            <img class="results-bg" src="images/results.png">
+            <div class="results" id="results">
+            </div>
+        </div>
+    </script>
+    <script type="text/template" id="scan-template">
+            <div class="container">
+                <canvas class="barcode"></canvas>
+                <h8>Click here to scan</h8>
+                <div style='height: 0px;width: 0px; overflow:hidden;'><input id="upfile" type="file" value="upload" accept="image/*" capture></div>
+                <div class="tip-input" style="top:52%;">
+                    <input class="local-input" id="QRlocal-input" type="text" value="5.00" />
+                    <select class="currency" id="QRcurrency">
+                        <option value="USD">USD</option>
+                        <option value="CAD">CAD</option>
+                    </select>    
+                    <input class="bitcoin-input" id="QRbitcoin-input" type="text" value="0.001" />
+                    <h6>BTC</h6>                
+                    <textarea class="comment-area" id="QRcomment-area" placeholder="Leave a comment?" />
+                    <button class="tip-button" id="QRtip-button">Tip</button>
+                </div>
+            </div>
+    </script>
+    <script>
+    function goBack()
+    {
+        window.history.back();
+    }
+        $.fn.serializeObject = function() {
+          var o = {};
+          var a = this.serializeArray();
+          $.each(a, function() {
+              if (o[this.name] !== undefined) {
+                  if (!o[this.name].push) {
+                      o[this.name] = [o[this.name]];
+                  }
+                  o[this.name].push(this.value || '');
+              } else {
+                  o[this.name] = this.value || '';
+              }
+          });
+          return o;
+        };        
+    $.ajaxPrefilter( function( options, originalOptions, jqXHR ) {
+        if (!(options.url.indexOf('https') > -1)){
+            options.url = 'http://localhost/newServer' + options.url;
+        }
+    });
+    Backbone.emulateHTTP = true;   
+    var User = Backbone.Model.extend({
+      urlRoot: "/tippers/"
+    });
+    var Tips = Backbone.Collection.extend({
+        initialize: function(options) {
+            this.id = options.id;
+        },
+        url: function() {
+            return "/clients/" + this.id + "/recent-tips";
+        },
+    });        
+    var Client = Backbone.Model.extend({
+        initialize: function(options) {
+            this.id = options.id;
+        },
+        urlRoot: function() {
+            return "/clients/" + this.id;
+        },
+    });
+    var Clients = Backbone.Collection.extend({
+        initialize: function(options) {
+            this.id = options.id;
+        },
+        url: function() {
+            return "/hubs/" + this.id + "/receivers";
+        },
+    });
+    var Users = Backbone.Collection.extend({
+        initialize: function(options) {
+            this.id = options.id;
+        },
+        url: function() {
+            return "/users/" + this.id;
+        },
+    });
+    var Place = Backbone.Model.extend({
+        initialize: function(options) {
+            this.id = options.id;
+        },
+        urlRoot: function() {
+            return "/hubs/" + this.id
+        },
+    });
+	var UserList = Backbone.View.extend({
+		el: '.page',
+        events: {
+            'submit .form-reg-est':'register'
+        },
+        register: function(ev) {
+           var estDetails = $(ev.currentTarget).serializeObject();
+            path = getID(document.URL);
+            estDetails.id = path;
+            estDetails.verification = "boobs";
+            $.ajax
+            ({
+                type: "POST",
+                url: '/establishment.php',
+                dataType: 'json',
+                async: false,
+                data: {
+                    json : JSON.stringify(estDetails),
+                    path: path
+                },
+                success:function(data){
+                    return false;   
+                    console.log(data);
+                    //generateCode();
+                },
+            })
+            .done (function (){
+                router.navigate('#/hubs/' + estDetails.id, {trigger:true});
+                return false;   
+            })
+            .fail (function (){
+                alert("errpr");
+            });
+            return false;            
+        },
+		render: function (options){         
+			var that = this;
+            if (options.id) {
+                clients = new Clients({id: options.id});
+                clients.fetch({ 
+                    success: function(clients){               
+                        var template = _.template($("#user-list-template").html(),{clients: clients.models});
+                        that.$el.html(template);
+                    },
+                    error: function(clients){
+                        var template = _.template($("#register-est-template").html(),{clients: null});
+                        that.$el.html(template);
+                    }
+                })
+            }
+        }
+    });
+        
+    var userList = new UserList();
+        
+    var vClient = Backbone.View.extend({
+        el: '.page',
+        events: {
+            'click #tip-button':'tip',  
+            'blur #local-input':'convert',
+            'change #currency':'convert',
+            'touchstart #local-input':'select'
+        },
+        select: function(ev){
+            ev.preventDefault();
+            var local = document.getElementById("local-input");
+            local.setSelectionRange(0, 9999);
+        },
+        convert: function(){
+            convertLocal();
+        },
+        tip: function(ev){
+            //processTip();
+        },
+        render: function (options) {
+        var that = this;
+            if (options.id) {
+                client = new Client({id: options.id});
+                client.fetch({
+                    success: function (client) {
+                        tips = new Tips({id: options.id});
+                        tips.fetch({
+                            success: function(tips) {                            
+                              var template = _.template($('#user-template').html(), {client: client, tips: tips.models});
+                              that.$el.html(template);
+                            }
+                        })
+                    },
+                    error: function (){
+                        alert('error');
+                    }
+                })
+            } else {
+              var template = _.template($('#user-template').html(), {client: null, tips: null});
+              that.$el.html(template);
+            }            
+        }
+    });
+        
+    var vclient = new vClient();
+    
+    var Search = Backbone.View.extend({
+        el: '.page',
+        events: {
+            'click .btnSearch':'search'
+        },
+        search: function(ev) {
+            searchEst();
+        },
+        render: function (){
+            var that = this;
+            var template = _.template($('#map').html(), {});
+            that.$el.html(template);
+            locate();
+        }
+    });
+    
+    var search = new Search(); 
+    
+    var Home = Backbone.View.extend({
+        el: '.page',
+        render: function (){
+            var template = _.template($('#home-template').html(),{});
+            this.$el.html(template);
+        }
+    });
+        
+    var home = new Home();
+        
+    var QRscan = Backbone.View.extend({
+        el: '.page',
+        events: {
+            'click #QRtip-button':'tip',
+            'click .barcode':'getFile',
+            'blur #QRlocal-input':'convert',
+            'change #QRcurrency':'convert',
+            'touchstart #QRlocal-input':'select'
+        },
+        select: function(ev){
+            ev.preventDefault();
+            var local = document.getElementById("QRlocal-input");
+            local.setSelectionRange(0, 9999);
+        },
+        convert: function(){
+            convertLocal();
+        },
+        getFile: function(){
+            document.getElementById("upfile").click();
+        },
+        tip: function(ev){
+            /*if (windows.location.href.indexOf("?code=") > -1){
+                var code = windows.location.href.split("=")[1];
+                $.get("OAuthExample.php", code,
+            //if url contains ?code= then
+            //var code = address
+            //get request with code to get balance response
+            $.get("/OAuthExample.php", function(data) {
+                window.location.href = data;
+                success: 
+                //get code from address, make get request to oauthexample.php with code as param
+                //should respond with balance
+                });*/
+        },
+        render: function (){
+            var template = _.template($('#scan-template').html(),{});
+            this.$el.html(template);
+            var input = document.querySelector('input[type=file]');
+            input.onchange = function () {
+                var file = input.files[0];
+                drawOnCanvas(file);   // see Example 6
+            };
+        }
+    });
+    
+    var qrScan = new QRscan();
+        
+    var Signup = Backbone.View.extend({
+        el: '.page',
+        events: {
+            'submit .new-user-form': 'createUser',
+            'submit .attach-form':'attach'
+        },
+        attach: function (ev){
+            var verification = document.getElementById("estVerification").value;
+            var id = document.getElementById("estID").value;
+            var place = new Place({id: id});
+            place.fetch({
+                success: function(place) {
+                    if (verification == place.get('verification')){
+                        attach(id);
+                    } else {
+                        alert("wrong code");
+                    };
+                },
+                error: function() {
+                    alert("bad id");
+                }
+            })
+            //get hubs/attDetails.ID/attDetails.ID
+            //check if attDetails.verification ==  est code
+            //attach(attDetails.estID);
+            return false;
+        },
+        createUser: function(ev){            
+            var userDetails = $(ev.currentTarget).serializeObject();
+            $.ajax
+            ({
+                type: "POST",
+                url: 'https://coinbase.com/api/v1/users',
+                dataType: 'json',
+                async: false,
+                data: {user : userDetails},
+                success:function(data){
+                    console.log(data);
+                    $.ajax
+                    ({
+                        type: "POST",
+                        url: '/user.php',
+                        dataType: 'json',
+                        async: false,
+                        data: {json : JSON.stringify(data)},
+                        success: function(){
+                            if(document.getElementById('receiver').checked) {
+                                router.navigate('#placeModal', {trigger:true});
+                                return false;
+                            } else {
+                                router.navigate('/', {trigger:true});
+                                return false;
+                            };                            
+                        },
+                        fail: function(){alert('user post error');},
+                    })
+                },
+            })
+            .fail (function (){
+                alert("errpr");
+            });
+            return false;
+        },
+        render: function (options){           
+            var that = this;
+            if (options.id){
+                var user = new User({id: options.id});       
+                user.fetch({
+                    success: function (user) { 
+                        var template = _.template($('#signup-template').html(),{user: user});
+                        that.$el.html(template);
+                    }                    
+                })
+            } else {
+                var template = _.template($('#signup-template').html(),{user: null});
+                that.$el.html(template);
+            }
+        }
+    });
+        
+    var signup = new Signup();
+                
+	var Router = Backbone.Router.extend({
+		routes: {
+			'': 'home',
+            'hubs/:id':'userlist',
+            'client/:id': 'client',
+            'scan':'scan',
+            'search': 'locate',
+            'signup':'signup',
+		}
+	});
+
+	var router = new Router();
+	router.on('route:home', function() {
+		home.render();
+	})
+    router.on('route:userlist', function(id) {
+        userList.render({id: id});
+    })
+    router.on('route:locate', function() {
+        search.render();
+    })
+    router.on('route:scan', function() {
+        qrScan.render();
+    })
+    router.on('route:signup', function(id) {
+        signup.render({id: id});
+    })
+    router.on('route:client', function(id) {
+        vclient.render({id: id});
+    })
+    Backbone.history.start();    
+    </script>
+</body>
+</html>
